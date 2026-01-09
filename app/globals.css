@@ -124,6 +124,12 @@
   }
 }
 
+@media (orientation: landscape) and (min-width: 900px) and (max-width: 1200px) {
+  html {
+    font-size: 18px;
+  }
+}
+
 @layer utilities {
   @keyframes fade-in {
     from {
