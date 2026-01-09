@@ -78,16 +78,41 @@ const Button = ({ children, onClick, variant = "primary", className = "", disabl
   )
 }
 
-const NumberControl = ({ label, value, min, max, step, onChange, unit = "", helpText = "" }) => {
-  const handleMinus = () => onChange(Math.max(min, Number((value - step).toFixed(2))))
-  const handlePlus = () => onChange(Math.min(max, Number((value + step).toFixed(2))))
+const NumberControl = ({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  unit = "",
+  helpText = "",
+  normalizeValue = null,
+  formatValue = null,
+  stepStrategy = null,
+}) => {
+  const resolveStep = (currentValue, direction) => (stepStrategy ? stepStrategy(currentValue, direction) : step)
+  const handleMinus = () => {
+    const currentStep = resolveStep(value, "down")
+    onChange(Math.max(min, Number((value - currentStep).toFixed(2))))
+  }
+  const handlePlus = () => {
+    const currentStep = resolveStep(value, "up")
+    onChange(Math.min(max, Number((value + currentStep).toFixed(2))))
+  }
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
       <div className="flex justify-between items-center mb-2">
         <label className="font-bold text-gray-700 text-sm md:text-base">{label}</label>
         <span className="text-blue-600 font-mono font-bold bg-blue-50 px-2 py-1 rounded text-sm md:text-base">
-          {typeof value === "number" ? (step < 1 ? value.toFixed(2) : value) : value}
+          {typeof value === "number"
+            ? formatValue
+              ? formatValue(value)
+              : typeof step === "number" && step < 1
+                ? value.toFixed(2)
+                : value
+            : value}
           {unit}
         </span>
       </div>
@@ -106,7 +131,10 @@ const NumberControl = ({ label, value, min, max, step, onChange, unit = "", help
           max={max}
           step={step}
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onChange={(e) => {
+            const nextValue = Number(e.target.value)
+            onChange(normalizeValue ? normalizeValue(nextValue, value) : nextValue)
+          }}
           className="flex-1 h-2.5 md:h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
         />
         <button
@@ -173,6 +201,19 @@ export default function FlashNumberTrainer() {
     setSessionResults([]) // Reset session
     setView("RUN")
   }
+
+  const normalizeDisplaySec = (nextValue) => {
+    if (nextValue <= 2) return Number(nextValue.toFixed(2))
+    return Math.max(3, Math.round(nextValue))
+  }
+
+  const resolveDisplayStep = (currentValue, direction) => {
+    if (currentValue > 2) return 1
+    if (currentValue === 2 && direction === "up") return 1
+    return 0.05
+  }
+
+  const formatDisplaySec = (value) => (value <= 2 ? value.toFixed(2) : value.toFixed(0))
 
   const handleHistoryClear = () => {
     if (window.confirm("履歴を全て消去しますか？")) {
@@ -273,9 +314,12 @@ export default function FlashNumberTrainer() {
             label="表示時間 (Display)"
             value={settings.displaySec}
             min={0.05}
-            max={2.0}
+            max={10.0}
             step={0.05}
             unit="s"
+            normalizeValue={(nextValue) => normalizeDisplaySec(nextValue)}
+            formatValue={(value) => formatDisplaySec(value)}
+            stepStrategy={(currentValue, direction) => resolveDisplayStep(currentValue, direction)}
             onChange={(v) => setSettings({ ...settings, displaySec: v })}
           />
         </div>
