@@ -359,7 +359,9 @@ export default function FlashNumberTrainer() {
                     <button
                       key={opt}
                       onClick={() => setSettings({ ...settings, numberRange: opt })}
-                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${settings.numberRange === opt ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"}`}
+                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${
+                        settings.numberRange === opt ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"
+                      }`}
                     >
                       {opt}
                     </button>
@@ -377,7 +379,9 @@ export default function FlashNumberTrainer() {
                     <button
                       key={opt.id}
                       onClick={() => setSettings({ ...settings, answerMode: opt.id })}
-                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${settings.answerMode === opt.id ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"}`}
+                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${
+                        settings.answerMode === opt.id ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"
+                      }`}
                     >
                       {opt.label}
                     </button>
@@ -390,10 +394,14 @@ export default function FlashNumberTrainer() {
               <label className="text-gray-700 font-medium text-sm md:text-base">フィードバックを表示</label>
               <button
                 onClick={() => setSettings({ ...settings, feedback: !settings.feedback })}
-                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${settings.feedback ? "bg-green-500" : "bg-gray-300"}`}
+                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${
+                  settings.feedback ? "bg-green-500" : "bg-gray-300"
+                }`}
               >
                 <div
-                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${settings.feedback ? "translate-x-6 md:translate-x-7" : ""}`}
+                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${
+                    settings.feedback ? "translate-x-6 md:translate-x-7" : ""
+                  }`}
                 />
               </button>
             </div>
@@ -402,10 +410,14 @@ export default function FlashNumberTrainer() {
               <label className="text-gray-700 font-medium text-sm md:text-base">履歴を記録する</label>
               <button
                 onClick={() => setSettings({ ...settings, recording: !settings.recording })}
-                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${settings.recording ? "bg-blue-500" : "bg-gray-300"}`}
+                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${
+                  settings.recording ? "bg-blue-500" : "bg-gray-300"
+                }`}
               >
                 <div
-                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${settings.recording ? "translate-x-6 md:translate-x-7" : ""}`}
+                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${
+                    settings.recording ? "translate-x-6 md:translate-x-7" : ""
+                  }`}
                 />
               </button>
             </div>
@@ -531,6 +543,43 @@ function RunSession({ settings, onFinish, onAbort }) {
   const [feedbackState, setFeedbackState] = useState(null) // 'correct' | 'incorrect' | 'verbal'
 
   const timerRef = useRef(null)
+
+  // --- Stimulus font auto-fit (by digits & viewport) ---
+  const [stimulusStyle, setStimulusStyle] = useState({ fontSizePx: 120, letterSpacingEm: 0.1 })
+
+  const updateStimulusStyle = useCallback(() => {
+    if (typeof window === "undefined") return
+
+    const digits = settings.digits
+
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+
+    // SHOW領域として使える幅/高さ（余白込みで安全側）
+    const availableW = vw * 0.92
+    const availableH = vh * 0.45
+
+    // 1文字の見かけ幅(おおよそ) + letterSpacing を想定してフィット計算
+    const charWidthEm = 0.62
+    const letterSpacingEm = Math.min(0.14, Math.max(0.06, 0.14 - digits * 0.01))
+
+    const totalEm = digits * charWidthEm + (digits - 1) * letterSpacingEm
+
+    const sizeByW = availableW / totalEm
+    const sizeByH = availableH
+
+    const MIN = 56
+    const MAX = 360
+
+    const fontSizePx = Math.max(MIN, Math.min(MAX, sizeByW, sizeByH))
+    setStimulusStyle({ fontSizePx: Math.floor(fontSizePx), letterSpacingEm })
+  }, [settings.digits])
+
+  useEffect(() => {
+    updateStimulusStyle()
+    window.addEventListener("resize", updateStimulusStyle)
+    return () => window.removeEventListener("resize", updateStimulusStyle)
+  }, [updateStimulusStyle])
 
   // --- Timer & Phase Management ---
 
@@ -694,7 +743,13 @@ function RunSession({ settings, onFinish, onAbort }) {
     if (phase === "SHOW") {
       return (
         <div className="flex-1 flex items-center justify-center animate-fade-in">
-          <div className="text-6xl md:text-8xl lg:text-9xl landscape:text-7xl font-black text-blue-900 tracking-widest tabular-nums">
+          <div
+            className="font-black text-blue-900 tabular-nums leading-none whitespace-nowrap px-4"
+            style={{
+              fontSize: `${stimulusStyle.fontSizePx}px`,
+              letterSpacing: `${stimulusStyle.letterSpacingEm}em`,
+            }}
+          >
             {currentStimulus}
           </div>
         </div>
@@ -863,7 +918,9 @@ function ResultScreen({ results, onNextSet, onHome }) {
           {results.map((r, i) => (
             <div
               key={i}
-              className={`flex justify-between items-center p-2.5 md:p-3 rounded-lg text-sm md:text-base ${r.isCorrect ? "bg-green-50" : "bg-red-50"}`}
+              className={`flex justify-between items-center p-2.5 md:p-3 rounded-lg text-sm md:text-base ${
+                r.isCorrect ? "bg-green-50" : "bg-red-50"
+              }`}
             >
               <span className="font-mono font-bold text-base md:text-lg">{r.trial}</span>
               <span className="font-mono text-gray-700 text-sm md:text-base">{r.stimulus}</span>
