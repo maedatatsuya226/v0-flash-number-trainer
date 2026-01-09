@@ -359,9 +359,7 @@ export default function FlashNumberTrainer() {
                     <button
                       key={opt}
                       onClick={() => setSettings({ ...settings, numberRange: opt })}
-                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${
-                        settings.numberRange === opt ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"
-                      }`}
+                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${settings.numberRange === opt ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"}`}
                     >
                       {opt}
                     </button>
@@ -379,9 +377,7 @@ export default function FlashNumberTrainer() {
                     <button
                       key={opt.id}
                       onClick={() => setSettings({ ...settings, answerMode: opt.id })}
-                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${
-                        settings.answerMode === opt.id ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"
-                      }`}
+                      className={`flex-1 py-2 text-sm md:text-base rounded-md transition-all ${settings.answerMode === opt.id ? "bg-white shadow text-blue-700 font-bold" : "text-gray-500"}`}
                     >
                       {opt.label}
                     </button>
@@ -394,14 +390,10 @@ export default function FlashNumberTrainer() {
               <label className="text-gray-700 font-medium text-sm md:text-base">フィードバックを表示</label>
               <button
                 onClick={() => setSettings({ ...settings, feedback: !settings.feedback })}
-                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${
-                  settings.feedback ? "bg-green-500" : "bg-gray-300"
-                }`}
+                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${settings.feedback ? "bg-green-500" : "bg-gray-300"}`}
               >
                 <div
-                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${
-                    settings.feedback ? "translate-x-6 md:translate-x-7" : ""
-                  }`}
+                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${settings.feedback ? "translate-x-6 md:translate-x-7" : ""}`}
                 />
               </button>
             </div>
@@ -410,14 +402,10 @@ export default function FlashNumberTrainer() {
               <label className="text-gray-700 font-medium text-sm md:text-base">履歴を記録する</label>
               <button
                 onClick={() => setSettings({ ...settings, recording: !settings.recording })}
-                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${
-                  settings.recording ? "bg-blue-500" : "bg-gray-300"
-                }`}
+                className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors relative ${settings.recording ? "bg-blue-500" : "bg-gray-300"}`}
               >
                 <div
-                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${
-                    settings.recording ? "translate-x-6 md:translate-x-7" : ""
-                  }`}
+                  className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform ${settings.recording ? "translate-x-6 md:translate-x-7" : ""}`}
                 />
               </button>
             </div>
@@ -481,10 +469,10 @@ export default function FlashNumberTrainer() {
 
       <div className="grid grid-cols-2 gap-3">
         <Button onClick={handleHistoryClear} variant="danger" size="sm">
-          <Delete className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2" /> 全消去
+          <Delete className="w-4 h-4 md:w-5 h-5 mr-1 md:mr-2" /> 全消去
         </Button>
         <Button onClick={exportCSV} variant="secondary" size="sm" disabled={currentHistory.length === 0}>
-          <Download className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2" /> CSV出力
+          <Download className="w-4 h-4 md:w-5 h-5 mr-1 md:mr-2" /> CSV出力
         </Button>
       </div>
     </div>
@@ -544,42 +532,83 @@ function RunSession({ settings, onFinish, onAbort }) {
 
   const timerRef = useRef(null)
 
-  // --- Stimulus font auto-fit (by digits & viewport) ---
+  // --- Stimulus font auto-fit (measured, never clip) ---
+  const showBoxRef = useRef(null)
+  const stimulusRef = useRef(null)
   const [stimulusStyle, setStimulusStyle] = useState({ fontSizePx: 120, letterSpacingEm: 0.1 })
 
-  const updateStimulusStyle = useCallback(() => {
+  const fitStimulus = useCallback(() => {
     if (typeof window === "undefined") return
+    const box = showBoxRef.current
+    const text = stimulusRef.current
+    if (!box || !text) return
 
     const digits = settings.digits
 
-    const vw = window.innerWidth
-    const vh = window.innerHeight
+    // 桁数が多いほど詰める（切れ防止）
+    const letterSpacingEm = Math.min(0.12, Math.max(0.02, 0.12 - digits * 0.012))
 
-    // SHOW領域として使える幅/高さ（余白込みで安全側）
-    const availableW = vw * 0.92
-    const availableH = vh * 0.45
+    // 使える幅/高さ（安全側）
+    const boxRect = box.getBoundingClientRect()
+    const availableW = boxRect.width * 0.96
+    const availableH = boxRect.height * 0.92
 
-    // 1文字の見かけ幅(おおよそ) + letterSpacing を想定してフィット計算
-    const charWidthEm = 0.62
-    const letterSpacingEm = Math.min(0.14, Math.max(0.06, 0.14 - digits * 0.01))
+    const MAX = 420
+    const MIN = 40
 
-    const totalEm = digits * charWidthEm + (digits - 1) * letterSpacingEm
+    // まず最大で当てて測る → 比率で縮める
+    text.style.fontSize = `${MAX}px`
+    text.style.letterSpacing = `${letterSpacingEm}em`
 
-    const sizeByW = availableW / totalEm
-    const sizeByH = availableH
+    const textRect1 = text.getBoundingClientRect()
+    if (textRect1.width === 0 || textRect1.height === 0) return
 
-    const MIN = 56
-    const MAX = 360
+    const scale = Math.min(availableW / textRect1.width, availableH / textRect1.height, 1)
+    let nextSize = Math.floor(MAX * scale)
+    nextSize = Math.max(MIN, Math.min(MAX, nextSize))
 
-    const fontSizePx = Math.max(MIN, Math.min(MAX, sizeByW, sizeByH))
-    setStimulusStyle({ fontSizePx: Math.floor(fontSizePx), letterSpacingEm })
+    // 丸め誤差などでまだはみ出す場合の安全調整
+    let safety = 0
+    while (safety < 3) {
+      text.style.fontSize = `${nextSize}px`
+      const r = text.getBoundingClientRect()
+      if (r.width <= availableW && r.height <= availableH) break
+      nextSize = Math.max(MIN, nextSize - 2)
+      safety += 1
+    }
+
+    setStimulusStyle({ fontSizePx: nextSize, letterSpacingEm })
   }, [settings.digits])
 
+  // SHOWに入った直後＆刺激が変わった直後にフィット（レイアウト確定後）
   useEffect(() => {
-    updateStimulusStyle()
-    window.addEventListener("resize", updateStimulusStyle)
-    return () => window.removeEventListener("resize", updateStimulusStyle)
-  }, [updateStimulusStyle])
+    if (phase !== "SHOW") return
+    const id = requestAnimationFrame(() => fitStimulus())
+    return () => cancelAnimationFrame(id)
+  }, [phase, currentStimulus, fitStimulus])
+
+  // リサイズ/回転にも追従
+  useEffect(() => {
+    const box = showBoxRef.current
+    if (!box) return
+
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => fitStimulus())
+      ro.observe(box)
+      window.addEventListener("orientationchange", fitStimulus)
+      return () => {
+        ro.disconnect()
+        window.removeEventListener("orientationchange", fitStimulus)
+      }
+    } else {
+      window.addEventListener("resize", fitStimulus)
+      window.addEventListener("orientationchange", fitStimulus)
+      return () => {
+        window.removeEventListener("resize", fitStimulus)
+        window.removeEventListener("orientationchange", fitStimulus)
+      }
+    }
+  }, [fitStimulus])
 
   // --- Timer & Phase Management ---
 
@@ -742,9 +771,13 @@ function RunSession({ settings, onFinish, onAbort }) {
   const renderMainArea = () => {
     if (phase === "SHOW") {
       return (
-        <div className="flex-1 flex items-center justify-center animate-fade-in">
+        <div
+          ref={showBoxRef}
+          className="flex-1 flex items-center justify-center animate-fade-in overflow-hidden px-2"
+        >
           <div
-            className="font-black text-blue-900 tabular-nums leading-none whitespace-nowrap px-4"
+            ref={stimulusRef}
+            className="font-black text-blue-900 tabular-nums leading-none whitespace-nowrap"
             style={{
               fontSize: `${stimulusStyle.fontSizePx}px`,
               letterSpacing: `${stimulusStyle.letterSpacingEm}em`,
@@ -808,12 +841,7 @@ function RunSession({ settings, onFinish, onAbort }) {
                   </button>
                 </div>
 
-                <Button
-                  onClick={() => submitAnswer(false)}
-                  variant="success"
-                  size="md"
-                  className="w-full landscape:py-2"
-                >
+                <Button onClick={() => submitAnswer(false)} variant="success" size="md" className="w-full landscape:py-2">
                   <Check className="mr-2 w-5 h-5 md:w-6 md:h-6 landscape:w-5 landscape:h-5" /> 確定
                 </Button>
               </>
